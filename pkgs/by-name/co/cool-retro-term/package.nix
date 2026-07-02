@@ -1,48 +1,54 @@
-{
-  lib,
-  stdenv,
-  fetchFromGitHub,
-  libsForQt5,
-  nixosTests,
+{ lib
+, stdenv
+, fetchFromGitHub
+, qt6
+, nixosTests
 }:
-
 stdenv.mkDerivation (finalAttrs: {
-  version = "1.2.0";
   pname = "cool-retro-term";
+  version = "2.0.0-beta2";
 
   src = fetchFromGitHub {
     owner = "Swordfish90";
     repo = "cool-retro-term";
     tag = finalAttrs.version;
-    hash = "sha256-PewHLVmo+RTBHIQ/y2FBkgXsIvujYd7u56JdFC10B4c=";
+    hash = "sha256-WCiQ+WTZVE3Cf6RWwD7BknkPTsXHordxcdq+HppQZ2Y=";
+    fetchSubmodules = true;
   };
 
-  patchPhase = ''
-    sed -i -e '/qmltermwidget/d' cool-retro-term.pro
-  '';
-
   buildInputs = [
-    libsForQt5.qtbase
-    libsForQt5.qmltermwidget
-    libsForQt5.qtquickcontrols2
-    libsForQt5.qtgraphicaleffects
+    qt6.qtbase
+    qt6.qtdeclarative
+    qt6.qtsvg
+    qt6.qt5compat
   ];
 
   nativeBuildInputs = [
-    libsForQt5.qmake
-    libsForQt5.wrapQtAppsHook
+    qt6.qmake
+    qt6.wrapQtAppsHook
   ];
 
   installFlags = [ "INSTALL_ROOT=$(out)" ];
 
-  preFixup = ''
-    mv $out/usr/share $out/share
-    mv $out/usr/bin $out/bin
-    rmdir $out/usr
-  ''
-  + lib.optionalString stdenv.hostPlatform.isDarwin ''
-    ln -s $out/bin/cool-retro-term.app/Contents/MacOS/cool-retro-term $out/bin/cool-retro-term
-  '';
+  qtWrapperArgs = [
+    "--prefix NIXPKGS_QT6_QML_IMPORT_PATH : ${placeholder "out"}/lib/qt-6/qml"
+  ];
+
+  preFixup =
+    ''
+      mkdir -p $out/lib/qt-6/qml
+      find $out/nix/store -name "QMLTermWidget" -type d | while read src; do
+        cp -r "$src" $out/lib/qt-6/qml/
+      done
+      rm -rf $out/nix
+
+      mv $out/usr/share $out/share
+      mv $out/usr/bin $out/bin
+      rmdir $out/usr
+    ''
+    + lib.optionalString stdenv.hostPlatform.isDarwin ''
+      ln -s $out/bin/cool-retro-term.app/Contents/MacOS/cool-retro-term $out/bin/cool-retro-term
+    '';
 
   passthru.tests.test = nixosTests.terminal-emulators.cool-retro-term;
 
